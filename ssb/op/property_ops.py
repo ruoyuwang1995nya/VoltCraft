@@ -46,7 +46,7 @@ class PropsMake(OP):
             op_in: OPIO,
     ) -> OPIO:
         from ..core.common_prop import make_property_instance
-        from apex.core.calculator.calculator import make_calculator
+        from ..core.calculator.calculator import make_calculator
 
         input_work_path = op_in["input_work_path"]
         path_to_prop = op_in["path_to_prop"]
@@ -75,6 +75,9 @@ class PropsMake(OP):
             print(glob.glob('./frozen*'))
             logging.debug(prop.task_type())  ### debug
             # if task_param has "cal_setting" key and it refers to a file, then ...
+            # custom util comes here
+            print(prop.task_type())
+            print(prop.task_param())
             inter.make_input_file(kk, prop.task_type(), prop.task_param())
         prop.post_process(
             task_list

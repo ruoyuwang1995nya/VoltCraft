@@ -4,16 +4,17 @@ import logging
 import os
 import re
 from pathlib import Path
-
+import dpdata
 import numpy as np
 from monty.serialization import dumpfn, loadfn
 
 from apex.core.calculator.lib import abacus_utils
 from apex.core.calculator.lib import vasp_utils
 from apex.core.calculator.lib import abacus_scf
-from apex.core.property.Property import Property
 from apex.core.refine import make_refine
 from apex.core.reproduce import make_repro, post_repro
+from ssb.core.property.Property import Property
+
 from dflow.python import upload_packages
 upload_packages.append(__file__)
 
@@ -32,6 +33,7 @@ class MSD(Property):
                 self.temperature = parameter["temperature"]
             parameter["cal_type"] = parameter.get("cal_type", "static")
             self.cal_type = parameter["cal_type"]
+            self.cal_setting=parameter["cal_setting"]
         
         # to be completed... 
         
@@ -170,10 +172,19 @@ class MSD(Property):
                         if os.path.exists(ii):
                             os.remove(ii)
                     task_list.append(output_task)
-                    os.symlink(os.path.relpath(equi_contcar), POSCAR)
-                    # scale = (vol / vol_to_poscar) ** (1. / 3.)
-
-                    msd_params = {"temperature": temp}
+                    
+                    if self.inter_param["type"] == "abacus":
+                        raise NotImplementedError("ABACUS interaction is not implemented yet!")
+                    else:
+                        supercell=dpdata.System(equi_contcar,fmt="vasp/poscar").replicate(self.supercell)
+                        sc_contcar=os.path.join(Path(path_to_work).parent,"SUPERCELL")
+                        supercell.to("vasp/poscar",
+                                     sc_contcar,
+                                     frame_idx=0)
+                    os.symlink(os.path.relpath(sc_contcar), POSCAR)
+                    msd_params = {"temperature": temp,
+                                  "supercell":self.supercell
+                                  }
                     dumpfn(msd_params, "msd.json", indent=4)
                     task_num += 1
                 os.chdir(cwd)
@@ -186,7 +197,10 @@ class MSD(Property):
         return self.parameter["type"]
 
     def task_param(self):
+        
         return self.parameter
+    def compute(self,output_file, all_tasks, all_res):
+        pass
 
     def _compute_lower(self, output_file, all_tasks, all_res):
         output_file = os.path.abspath(output_file)
