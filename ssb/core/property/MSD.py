@@ -2,18 +2,22 @@ import glob
 import json
 import logging
 import os
+import shutil
 import re
 from pathlib import Path
 import dpdata
 import numpy as np
+import matplotlib
+matplotlib.use('pdf')
+import matplotlib.pyplot as plt
 from monty.serialization import dumpfn, loadfn
-
+from apex.core.property.Property import Property
 from apex.core.calculator.lib import abacus_utils
 from apex.core.calculator.lib import vasp_utils
 from apex.core.calculator.lib import abacus_scf
 from apex.core.refine import make_refine
 from apex.core.reproduce import make_repro, post_repro
-from ssb.core.property.Property import Property
+#from ssb.core.property.Property import Property
 
 from dflow.python import upload_packages
 upload_packages.append(__file__)
@@ -24,18 +28,32 @@ class MSD(Property):
         parameter["reproduce"] = parameter.get("reproduce", False)
         self.reprod = parameter["reproduce"]
         if not self.reprod:
-            if not ("init_from_suffix" in parameter and "output_suffix" in parameter):
-                default_supercell = [1, 1, 1]
-                default_temperature = [300] # in Kelvin
-                parameter["supercell"] = parameter.get("supercell", default_supercell)
-                self.supercell = parameter["supercell"]
-                parameter["temperature"] = parameter.get("temperature", default_temperature)
-                self.temperature = parameter["temperature"]
+            #if not ("init_from_suffix" in parameter and "output_suffix" in parameter):
+            default_supercell = [1, 1, 1]
+            default_temperature = 300 # in Kelvin
+            parameter["supercell"] = parameter.get("supercell", default_supercell)
+            self.supercell = parameter["supercell"]
+            
             parameter["cal_type"] = parameter.get("cal_type", "static")
             self.cal_type = parameter["cal_type"]
+            
+            ## if custom in.lammps is used
+            self.custom_input=parameter.get("custom_input")
+            
+            
+            ## if template in.lammps is used
+            self.using_template=parameter.get("using_template",True)
+            #  temperature for template
+            parameter["temperature"] = parameter.get("temperature", default_temperature)
+            self.temperature = parameter["temperature"]
+            
+            # cal_setting for template
+            parameter["cal_setting"]=parameter.get("cal_setting",{})
             self.cal_setting=parameter["cal_setting"]
-        
-        # to be completed... 
+            
+            ## settings for output format
+            parameter["res_setting"]=parameter.get("res_setting",{})
+            
         
         self.parameter = parameter
         self.inter_param = inter_param if inter_param != None else {"type": "vasp"}
@@ -56,77 +74,21 @@ class MSD(Property):
         if "start_confs_path" in self.parameter and os.path.exists(
             self.parameter["start_confs_path"]
         ):
-            init_path_list = glob.glob(
-                os.path.join(self.parameter["start_confs_path"], "*")
-            )
-            struct_init_name_list = []
-            for ii in init_path_list:
-                struct_init_name_list.append(ii.split("/")[-1])
-            struct_output_name = path_to_work.split("/")[-2]
-            assert struct_output_name in struct_init_name_list
-            path_to_equi = os.path.abspath(
-                os.path.join(
-                    self.parameter["start_confs_path"],
-                    struct_output_name,
-                    "relaxation",
-                    "relax_task",
-                )
-            )
+            pass
 
         cwd = os.getcwd()
         task_list = []
         # reproduce previous results (provided with input files?)
         if self.reprod:
-            print("msd reproduce starts")
-            if "init_data_path" not in self.parameter:
-                raise RuntimeError("please provide the initial data path to reproduce")
-            init_data_path = os.path.abspath(self.parameter["init_data_path"])
-            task_list = make_repro(
-                self.inter_param,
-                init_data_path,
-                self.init_from_suffix,
-                path_to_work,
-                self.parameter.get("reprod_last_frame", True),
-            )
-            os.chdir(cwd)
+            pass
 
         else:
             if refine:
-                print("msd refine starts")
-                task_list = make_refine(
-                    self.parameter["init_from_suffix"],
-                    self.parameter["output_suffix"],
-                    path_to_work,
-                )
-                os.chdir(cwd)
-
-                init_from_path = re.sub(
-                    self.parameter["output_suffix"][::-1],
-                    self.parameter["init_from_suffix"][::-1],
-                    path_to_work[::-1],
-                    count=1,
-                )[::-1]
-                task_list_basename = list(map(os.path.basename, task_list))
-
-                for ii in task_list_basename:
-                    init_from_task = os.path.join(init_from_path, ii)
-                    output_task = os.path.join(path_to_work, ii)
-                    os.chdir(output_task)
-                    if os.path.isfile("eos.json"):
-                        os.remove("eos.json")
-                    if os.path.islink("eos.json"):
-                        os.remove("eos.json")
-                    os.symlink(
-                        os.path.relpath(os.path.join(init_from_task, "eos.json")),
-                        "eos.json",
-                    )
-                os.chdir(cwd)
+                pass
 
             else:
                 print(
-                    "gen msd at temperatures "
-                    + str(self.temperature)
-                    + "K"
+                    "Start generating mean square displacement calculation"
                 )
 
                 if self.inter_param["type"] == "abacus":
@@ -146,9 +108,43 @@ class MSD(Property):
                         "Can not find %s, please provide with POSCAR" % equi_contcar
                         )
 
-
                 task_num = 0
-                for temp in self.temperature:
+                task_map=[]
+                input_prop=[]
+                if self.custom_input\
+                    and isinstance(self.custom_input,str):
+                    logging.info("Using default user input. Overriding temperature setting")
+                    if os.path.isfile(self.custom_input):
+                        task_map.append("overridden")
+                        input_prop.append(os.path.abspath(self.custom_input))
+                    else:
+                        raise FileNotFoundError("The input file %s does not exist!"%self.custom_input)
+                    
+                elif self.custom_input\
+                    and isinstance(self.custom_input,list):
+                    logging.info("Using default user input. Overriding temperature setting")
+                    for id,ipt in enumerate(self.custom_input):
+                        if os.path.isfile(ipt):
+                            input_prop.append(os.path.abspath(ipt))
+                            task_map.append("task.%06d"%id)
+                        else:
+                            raise FileNotFoundError("The input file %s does not exist!" %ipt)
+                    
+                elif self.using_template is True:
+                    logging.info("Using templated LAMMPS input file!")
+                    if isinstance(self.temperature,int):
+                        task_map.append(self.temperature)
+                        self.parameter["cal_temperature"]=self.temperature
+                    elif isinstance(self.temperature,list):
+                        task_map.extend(self.temperature)
+                        self.parameter["cal_temperature"]=self.temperature
+                    else:
+                        raise TypeError("Temperature has to be an integer!")
+                    
+                else:
+                    raise RuntimeError("Either use a template or provide a custom in.lammps!")
+                
+                for temp in task_map:
                     # this actually has something to do with the "Property.compute()" 
                     # method invoked within the PropsPost OP. Task dir must have the 
                     # form task.%06d
@@ -157,11 +153,8 @@ class MSD(Property):
                     os.chdir(output_task)
                     if self.inter_param["type"] == "abacus":
                         POSCAR = "STRU"
-                        #POSCAR_orig = "STRU.orig"
                     else:
                         POSCAR = "POSCAR"
-                        #POSCAR_orig = "POSCAR.orig"
-
                     for ii in [
                         "INCAR",
                         "POTCAR",
@@ -182,6 +175,10 @@ class MSD(Property):
                                      sc_contcar,
                                      frame_idx=0)
                     os.symlink(os.path.relpath(sc_contcar), POSCAR)
+                    # if custom_input
+                    if len(input_prop)>0:
+                        shutil.copy(input_prop[task_num],"in.lammps")
+                    
                     msd_params = {"temperature": temp,
                                   "supercell":self.supercell
                                   }
@@ -194,40 +191,92 @@ class MSD(Property):
         pass
 
     def task_type(self):
-        return self.parameter["type"]
+        return "msd"#self.parameter["type"]
 
     def task_param(self):
-        
         return self.parameter
-    def compute(self,output_file, all_tasks, all_res):
-        pass
-
-    def _compute_lower(self, output_file, all_tasks, all_res):
-        output_file = os.path.abspath(output_file)
-        res_data = {}
-        ptr_data = "conf_dir: " + os.path.dirname(output_file) + "\n"
-        if not self.reprod:
-            ptr_data += " VpA(A^3)  EpA(eV)\n"
-            for ii in range(len(all_tasks)):
-                # vol = self.vol_start + ii * self.vol_step
-                temp = loadfn(os.path.join(all_tasks[ii], "msd.json"))["temperature"]
-                task_result = loadfn(all_res[ii])
-                # do nothing here? 
+    
+    def compute(self,output_file, print_file, path_to_work):
+        if skip:=self.parameter["res_setting"].get("skip"):
+            if skip is True:
+                logging.warning("result proccessing is skipped!")
+                return
+        logging.info("Processing msd output!")
+        path_to_work = os.path.abspath(path_to_work)
+        # task directory
+        task_dirs = glob.glob(os.path.join(path_to_work, "task.[0-9]*[0-9]"))
+        task_dirs.sort()
+        # read msd output filename
+        res_setting=self.parameter["res_setting"]
+        msd_data=res_setting.get("filename","msd.out")
+        
+        all_res=[]
+        for ii in task_dirs:
+            task_res={}
+            msd_data=os.path.join(ii,msd_data)
+            task_res["diffusion_coef"]=__class__.msd2diff(msd_data,res_setting,png_path=ii)
+            if self.using_template is True:
+                task_res["cal_setting"]=self.cal_setting
+            else:
+                task_res["cal_setting"]="custom"
+            dumpfn(task_res,os.path.join(ii,"result_task.json"),indent=4)
+            all_res.append(os.path.join(ii,"result_task.json"))
+            
+        res, ptr = self._compute_lower(output_file,task_dirs,all_res)
+        
+        with open(output_file,"w") as fp:
+            json.dump(res,fp,indent=4)
                 
-
-        else:
-            if "init_data_path" not in self.parameter:
-                raise RuntimeError("please provide the initial data path to reproduce")
-            init_data_path = os.path.abspath(self.parameter["init_data_path"])
-            res_data, ptr_data = post_repro(
-                init_data_path,
-                self.parameter["init_from_suffix"],
-                all_tasks,
-                ptr_data,
-                self.parameter.get("reprod_last_frame", True),
-            )
-
-        with open(output_file, "w") as fp:
-            json.dump(res_data, fp, indent=4)
-
+        with open(print_file,"w") as fp:
+            fp.write(ptr)
+            
+    def _compute_lower(self,output_file, all_tasks, all_res):
+        output_file=os.path.abspath(output_file)
+        res_data={}
+        ptr_data="conf_dir: "+os.path.basename(output_file)+"\n"
+        for ii in range(len(all_tasks)):
+            task_result=loadfn(all_res[ii])
+            res_data[os.path.basename(all_tasks[ii])]=task_result
+            ptr_data+=os.path.basename(all_tasks[ii])+":\n"
+            ptr_data+=json.dumps(task_result)
         return res_data, ptr_data
+    
+    @staticmethod
+    def msd2diff(
+                 msd_data,
+                param:dict,
+                png_path='./'
+                         ):
+        if not os.path.isfile(msd_data):
+            logging.warning("Invalid msd output filepath!")
+            return
+        delimiter=param.get("delimiter")
+        data = np.loadtxt(msd_data,delimiter=delimiter)
+        
+        
+        timestep = data[:, 0]
+        dt=param.get("dt",1)
+        time = timestep * dt   # input.lammps：t_step= 1fs
+        
+        
+
+        n = data.shape[0]
+        n1 = int(n * 0.3)
+        n2 = int(n * 0.9)
+        
+        ion_list=param.get("ion_list",["ion_%s"%(i+1) for i in range(data.shape[1])])
+        msd={}
+        diff={}
+        diff_cvt=param.get("diff_cvt",1e-5)
+        for idx,ion in enumerate(ion_list):
+            msd[ion] = data[:, idx]
+            plt.plot(time, msd[ion], label=ion) # 1fs= 1/1000ps
+            slope,residuals = np.polyfit(time[n1:n2], msd[ion][n1:n2], 1)
+            diff[ion]=slope/6*diff_cvt 
+        plt.xlabel('timestep(ps)')
+        plt.ylabel('MSD(Å^2)')
+        plt.legend()
+        plt.grid()
+        #plt.show()
+        plt.savefig(os.path.join(png_path,'msd.png'), dpi=300)
+        return diff

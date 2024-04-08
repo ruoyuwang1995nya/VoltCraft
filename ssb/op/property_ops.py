@@ -66,13 +66,8 @@ class PropsMake(OP):
         task_list = prop.make_confs(abs_path_to_prop, path_to_equi, do_refine)
         for kk in task_list:
             poscar = os.path.join(kk, "POSCAR")
-            
-            print(os.getcwd())
             inter = make_calculator(inter_param, poscar)
-            print('model is', inter.model)
-            print(glob.glob('./frozen*'))
             inter.make_potential_files(kk)
-            print(glob.glob('./frozen*'))
             logging.debug(prop.task_type())  ### debug
             # if task_param has "cal_setting" key and it refers to a file, then ...
             # custom util comes here
@@ -117,12 +112,12 @@ class PropsPost(OP):
     @classmethod
     def get_input_sign(cls):
         return OPIOSign({
-            'input_post': Artifact(Path, sub_path=False),
-            'input_all': Artifact(Path),
+            'input_post': Artifact(Path, sub_path=False), # .... $PATH_TO_ARTIFACTS/input_post, from the **runcal** step
+            'input_all': Artifact(Path), # path to work_dir, e.g., $PATH_TO_ARTIFACTS/input_all/tmp/simple, from the **make** step
             'prop_param': dict,
             'inter_param': dict,
-            'task_names': List[str],
-            'path_to_prop': str
+            'task_names': List[str], # e.g. [confs/std-bcc/msd-00/task.000001]
+            'path_to_prop': str # e.g., confs/std-bcc/msd-00
         })
 
     @classmethod
@@ -135,6 +130,8 @@ class PropsPost(OP):
     def execute(self, op_in: OPIO) -> OPIO:
         from ..core.common_prop import make_property_instance
         cwd = os.getcwd()
+        print(cwd)
+        print(op_in)
         input_post = op_in["input_post"]
         input_all = op_in["input_all"]
         prop_param = op_in["prop_param"]
@@ -150,7 +147,7 @@ class PropsPost(OP):
 
         # find path of finished tasks
         os.chdir(op_in['input_post'])
-        src_path = recursive_search(copy_dir_list)
+        src_path = recursive_search(copy_dir_list) # results from run_op
         if not src_path:
             raise RuntimeError(f'Fail to find input work path after slices!')
 
@@ -160,7 +157,7 @@ class PropsPost(OP):
                 shutil.copytree(os.path.join(ii, "backward_dir"), ii, dirs_exist_ok=True)
                 shutil.rmtree(os.path.join(ii, "backward_dir"))
             os.chdir(input_all)
-            shutil.copytree(input_post, './', dirs_exist_ok=True)
+            shutil.copytree(input_post, './', dirs_exist_ok=True) # copy calculation result from run_op
         else:
             os.chdir(input_all)
             #src_path = str(input_post) + str(local_path)
@@ -170,7 +167,9 @@ class PropsPost(OP):
                 and "overwrite_interaction" in prop_param["cal_setting"]):
             inter_param = prop_param["cal_setting"]["overwrite_interaction"]
 
+        # cwd: XXX/input_all
         abs_path_to_prop = Path.cwd() / path_to_prop
+        print(abs_path_to_prop)
 
         prop = make_property_instance(prop_param, inter_param)
         prop.compute(
@@ -183,11 +182,11 @@ class PropsPost(OP):
         cmd = "for kk in task.*; do cd $kk; rm *.pb; cd ..; done"
         subprocess.call(cmd, shell=True)
 
-        os.chdir(cwd)
+        os.chdir(cwd) # workdir
         out_path = Path(cwd) / 'retrieve_pool'
         os.mkdir(out_path)
         shutil.copytree(input_all / path_to_prop,
-                        out_path / path_to_prop, dirs_exist_ok=True)
+                        out_path / path_to_prop, dirs_exist_ok=True)# not sure why...
 
         op_out = OPIO({
             'output_post': abs_path_to_prop

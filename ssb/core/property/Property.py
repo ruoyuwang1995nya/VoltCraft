@@ -86,6 +86,7 @@ class Property(ABC):
             The working directory where the computational tasks locate.
         """
         pass
+        # os.chdir(cwd)
 
     @abstractmethod
     def _compute_lower(self, output_file, all_tasks, all_res):

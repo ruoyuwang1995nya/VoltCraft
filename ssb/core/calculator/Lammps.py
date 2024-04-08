@@ -1,6 +1,8 @@
 import os
 import warnings
 import logging
+from pathlib import Path
+import copy
 
 from monty.serialization import dumpfn, loadfn
 
@@ -145,7 +147,6 @@ class Lammps(Task):
         B0 = 70
         bp = 0
         ntypes = len(self.type_map)
-        temperature = 300
 
         cal_type = task_param["cal_type"]
         cal_setting = task_param["cal_setting"]
@@ -168,16 +169,32 @@ class Lammps(Task):
             logging.basicConfig(level=logging.INFO, filename='info.log', filemode='w',
                                 format='%(asctime)s - %(levelname)s - %(message)s')
             logging.debug("The path is ", output_dir)
-            temperature_list=task_param.get("temperature")
-            task_idx=int(output_dir.split('.',-1)[-1])
-            temperature=temperature_list[task_idx]
-            logging.info("The temperature is ", temperature)
-            task_param["cal_temperature"]=temperature
-            fc = lammps_utils_custom.make_lammps_property(
-                    "conf.lmp", self.type_map, self.inter_func, self.model_param,task_type,task_param
-                )
+            if os.path.isfile(os.path.join(output_dir,"in.lammps")):
+                with open(os.path.join(output_dir,"in.lammps"),'r') as fin:
+                    fc=fin.read()
+            else:
+                if isinstance(task_param["cal_temperature"],list):
+                    output_dir_str=Path(output_dir).name
+                    idx_task=int(output_dir_str.split('.',-1)[-1])
+                    task_param_tmp=copy.copy(task_param)
+                    task_param_tmp["cal_temperature"]=task_param["cal_temperature"][idx_task]
+                    print(task_param_tmp)
+                    fc = lammps_utils_custom.make_lammps_property(
+                        "conf.lmp", self.type_map, 
+                        self.inter_func, 
+                        self.model_param,
+                        task_type,
+                        task_param_tmp
+                        )
+                else:
+                    fc = lammps_utils_custom.make_lammps_property(
+                        "conf.lmp", self.type_map, 
+                        self.inter_func, 
+                        self.model_param,
+                        task_type,
+                        task_param
+                        )
              
-
         else:
             logging.basicConfig(level=logging.INFO, filename='info.log', filemode='w',
                                 format='%(asctime)s - %(levelname)s - %(message)s')
