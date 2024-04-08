@@ -22,7 +22,8 @@ setuptools.setup(
         "matplotlib",
         "seekpath",
         "fpop>=0.0.7",
-        "boto3"
+        "boto3",
+        "apex"
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
