@@ -264,7 +264,7 @@ class MSD(Property):
         n1 = int(n * 0.3)
         n2 = int(n * 0.9)
         
-        ion_list=param.get("ion_list",["ion_%s"%(i+1) for i in range(data.shape[1])])
+        ion_list=param.get("ion_list",["ion_%s"%(i+1) for i in range(data.shape[1]-1)])
         msd={}
         diff={}
         diff_cvt=param.get("diff_cvt",1e-5)
