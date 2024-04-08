@@ -1,0 +1,30 @@
+{
+    "structures":    ["confs/std-*"],
+    "interaction": {
+        "type":          "deepmd",
+        "model":         "frozen_model.pb",
+        "deepmd_version":"2.2.8",
+        "type_map":      {"Mo": 0}
+    },
+    "properties": [
+        {
+         "type":         "msd",
+         "skip":         false,
+         "using_template": true,
+         "temperature": 300,
+         "supercell":      [1,1,1],
+	      "cal_setting":  {
+                "equi_setting":{
+                    "thermo-step":100,
+                    "run-step":100
+            },
+                "prop_setting":{
+                    "thermo-step":100,
+                    "run-step":100,
+                    "msd_step":10
+                }
+                    
+            }
+        }
+        ]
+}

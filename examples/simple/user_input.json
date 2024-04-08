@@ -1,0 +1,24 @@
+{
+    "structures":    ["confs/std-*"],
+    "interaction": {
+        "type":          "deepmd",
+        "model":         "frozen_model.pb",
+        "deepmd_version":"2.2.8",
+        "type_map":      {"Mo": 0}
+    },
+    "properties": [
+        {
+         "type":         "msd",
+         "skip":         false,
+         "custom_input":"./in.lammps",
+         "supercell":      [1,1,1],
+	      "cal_setting":  {
+                "equi_setting":{},
+                "prop_setting":{}
+                    
+            }
+        }
+
+
+        ]
+}
