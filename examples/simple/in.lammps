@@ -8,7 +8,7 @@ variable T equal 300
 read_data   conf.lmp
 mass            1 95.940
 neigh_modify    every 1 delay 0 check no
-pair_style deepmd f r o z e n _ m o d e l . p b  out_freq 10 out_file model_devi.out
+pair_style deepmd frozen_model.pb out_freq 10 out_file model_devi.out
 pair_coeff * *
 group  Mo type 1
 velocity  all create $T 33456 mom yes dist gaussian
