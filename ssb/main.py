@@ -5,14 +5,14 @@ from apex import (
     __version__,
 )
 from apex.run_step import run_step
-from apex.submit import submit_workflow
+from .submit import submit_workflow
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description=f"SSB: A scientific workflow for Solid State Battery Simulation "
+        description=f"VoltCraft: A scientific workflow for Battery Simulation "
                     f"(v{__version__})\n"
-                    f"Type 'ssb -h' for help.",
+                    f"Type 'vcraft -h' for help.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     subparsers = parser.add_subparsers(title="Valid subcommands", dest="cmd")
@@ -21,13 +21,13 @@ def parse_args():
         "-v",
         "--version",
         action="version",
-        version=f"SSB v{__version__}"
+        version=f"VoltCraft v{__version__}"
     )
     ##########################################
     # Submit
     parser_submit = subparsers.add_parser(
         "submit",
-        help="Submit an SSB workflow",
+        help="Submit an VoltCraft workflow",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser_submit.add_argument(
@@ -51,7 +51,7 @@ def parse_args():
     parser_submit.add_argument(
         "-d", "--debug",
         action="store_true",
-        help="Run SSB workflow via local debug mode"
+        help="Run VoltCraft workflow via local debug mode"
     )
     parser_submit.add_argument(
         '-f', "--flow",
@@ -101,7 +101,7 @@ def main():
     logging.basicConfig(level=logging.INFO)
     # parse args
     parser, args = parse_args()
-    header()
+    #header()
     if args.cmd == 'submit':
         submit_workflow(
             parameter=args.parameter,
