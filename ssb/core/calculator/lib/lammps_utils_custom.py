@@ -75,7 +75,7 @@ def make_lammps_msd(
     ret += "velocity  all create $T 33456 mom yes dist gaussian\n"
     # equilibration: npt
     ret += "fix 1 all npt temp $T $T 0.2 iso 1 1 2\n"
-    ret += "thermo_style custom step temp\n"
+    ret += "thermo_style custom step pe ke etotal press lx ly lz vol density\n"
     ret += "thermo %d\n" %equi_setting.get("thermo-step",1000)
     ret += "run %d\n" %equi_setting.get("run-step",10000)
     ret += "unfix 1\n"
@@ -88,7 +88,7 @@ def make_lammps_msd(
     msd_step=prop_setting.get("msd_step",10)
     ret += "fix 2 all ave/time %d 1 %d %s file msd.out\n"%(msd_step,msd_step,c_msd)
     ret += "fix 1 all nvt temp $T $T 100.0\n"
-    ret += "thermo_style custom step temp\n"
+    ret += "thermo_style custom step time temp ke etotal press density\n"
     ret += "thermo %d\n"%prop_setting.get("thermo-step",1000)
     ret += "run %d\n"%prop_setting.get("run-step",10000)
     return ret
