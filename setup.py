@@ -4,11 +4,11 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="ssb-flow",
+    name="VoltCraft",
     version="0.0.1",
     author="Ruoyu Wang",
     author_email="ruoyuwang1995@gmail.com",
-    description="Solid State Electrolyte Properties EXplorer using simulations",
+    description="AI-driven battery simulations",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/ruoyuwang1995ucas/LAM-SSB.git",
@@ -31,6 +31,6 @@ setuptools.setup(
     ],
     python_requires='>=3.8',
     entry_points={'console_scripts': [
-         'ssb = ssb.__main__:main',
+         'vcraft = ssb.__main__:main',
      ]}
 )
