@@ -25,12 +25,12 @@ At current stage, VoltCraft implements modules aiming for atomic simulation of s
 ## 2. Installation
 VoltCraft can be built and installed form the source. Clone the package firstly by
 ```shell
-git clone https://github.com/ruoyuwang1995ucas/LAM-SSB.git
+git clone https://github.com/ruoyuwang1995ucas/VoltCraft.git
 ```
 
 then install by
 ```shell
-cd LAM-SSB
+cd VoltCraft
 pip install .
 ```
 
