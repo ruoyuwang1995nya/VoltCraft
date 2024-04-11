@@ -252,31 +252,27 @@ class MSD(Property):
             return
         delimiter=param.get("delimiter")
         data = np.loadtxt(msd_data,delimiter=delimiter)
-        
-        
         timestep = data[:, 0]
         dt=param.get("dt",1)
         time = timestep * dt   # input.lammps：t_step= 1fs
-        
-
         n = data.shape[0]
         n1 = int(n * 0.3)
         n2 = int(n * 0.9)
-        
         ion_list=param.get("ion_list",["ion_%s"%(i+1) for i in range(data.shape[1]-1)])
         msd={}
         diff={}
         diff_cvt=param.get("diff_cvt",1e-5)
+        plt.clf()
         for idx,ion in enumerate(ion_list):
-            msd[ion] = data[:, idx]
-            print(msd[ion])
-            plt.plot(time, msd[ion], label=ion) # 1fs= 1/1000ps
+            msd[ion] = data[:, idx+1]
+            plt.scatter(time, msd[ion], label=ion) # 1fs= 1/1000ps
             slope,residuals = np.polyfit(time[n1:n2], msd[ion][n1:n2], 1)
-            diff[ion]=slope/6*diff_cvt 
-        plt.xlabel('timestep(ps)')
-        plt.ylabel('MSD(Å^2)')
+            plt.plot(time,[slope * t + residuals for t in time],color="gray")
+            diff[ion]=slope/6*diff_cvt # convert to m^2/s
+        plt.xlabel('timestep(%s)'%param.get("time_unit","fs"))
+        plt.ylabel('MSD(%s$^2$)'%param.get("length_unit","Å"))
+        plt.title("MSD")
         plt.legend()
         plt.grid()
-        #plt.show()
         plt.savefig(os.path.join(png_path,'msd.png'), dpi=300)
         return diff
