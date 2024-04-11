@@ -1,0 +1,90 @@
+
+## 
+units 	metal
+dimension	3
+boundary	p p p
+atom_style	atomic
+box         tilt large
+read_data   conf.lmp
+
+mass            1 6.941000
+mass            2 10.811000
+mass            3 15.999400
+mass            4 26.981000
+mass            5 28.085500
+mass            6 30.973800
+mass            7 32.065000
+mass            8 35.453000
+mass            9 69.723000
+mass            10 72.640000
+mass            11 74.921000
+mass            12 79.904000
+mass            13 118.710000
+mass            14 121.760000
+mass            15 126.904000
+
+neigh_modify    every 1 delay 0 check no
+
+pair_style      deepmd ./com.pb
+pair_coeff      * *
+
+##################################################################################
+
+variable        temp            equal 300
+variable        eql_step        equal 10000000
+variable        rd_seed         equal 666666
+
+variable        temp_damp       equal 0.2 # tau_NVT = timestep * 100 
+variable        t_step          equal 0.002
+variable        rlx_step        equal 50000
+
+variable        thermo_freq     equal 1000
+variable        dump_freq       equal 10000
+
+
+group                   Li type 1
+group                   Cl type 8
+group                   P  type 6
+group                   S  type 7
+
+
+thermo_style    custom step pe ke etotal press lx ly lz vol density
+thermo          100
+
+velocity        all create ${temp} 666666
+
+fix             1 all npt temp ${temp} ${temp} 0.2 iso 1 1 2
+timestep        ${t_step}
+run             ${rlx_step}
+unfix           1
+write_restart   npt.restart
+
+reset_timestep  0
+
+##################################################################################
+
+## nvt-equal
+fix             equil all nvt temp ${temp} ${temp} 0.2
+timestep        ${t_step}
+#fix             com all recenter INIT INIT INIT
+
+# rdf calculation
+#compute         rdf all rdf 100 6 2 2 2 2 3 2 4
+#fix                            1 all ave/time 100 1 100 c_rdf[*] file target.rdf mode vector
+
+# msd calculation
+compute                 msd1 Li msd
+compute                 msd2 Cl msd
+compute                 msd3 P  msd
+compute                 msd4 S  msd
+fix             2 all ave/time 100 1 100 c_msd1[4] c_msd2[4] c_msd3[4] c_msd4[4]  file target.msd
+
+## thermo_style
+thermo_style    custom step time temp ke etotal press density
+thermo          ${thermo_freq}
+thermo_modify   flush yes
+dump            3 all custom ${dump_freq} dump.lammpstraj id type x y z
+run             ${eql_step}
+
+write_restart   msd.restart
+

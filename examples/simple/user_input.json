@@ -1,0 +1,27 @@
+{
+    "structures":    ["confs/std-*"],
+    "interaction": {
+        "type":          "deepmd",
+        "model":         "frozen_model.pb",
+        "deepmd_version":"2.2.8",
+        "type_map":      {"Mo": 0}
+    },
+    "properties": [
+        {
+         "type":         "msd",
+         "skip":         false,
+         "custom_input":"./in.lammps",
+         "supercell":      [1,1,1],
+	      "res_setting":  {
+                    "filename":"msd.out",
+                    "delimiter": " ",
+                    "ion_list":["Mo"],
+                    "dt":1,
+                    "diff_cvt":1e-5
+
+            }
+        }
+
+
+        ]
+}

@@ -1,0 +1,27 @@
+{
+    "structures":    ["confs/conf-1"],
+    "interaction": {
+        "type":          "deepmd",
+        "model":         "frozen_model.pb",
+        "deepmd_version":"2.2.8",
+        "type_map":{"Li":0,"P":1,"S":2,"Cl":3}
+    },
+    "properties": [
+        {
+         "type":         "msd",
+         "skip":         false,
+         "custom_input":"./in.lmp",
+         "supercell":      [1,1,1],
+	      "res_setting":  {
+                    "filename":"target.msd",
+                    "delimiter": " ",
+                    "ion_list":["Li","Cl","P","S"],
+                    "dt":1,
+                    "diff_cvt":1e-5
+
+            }
+        }
+
+
+        ]
+}
