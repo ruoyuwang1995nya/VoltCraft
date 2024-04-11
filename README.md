@@ -3,7 +3,12 @@
 
 ## 1. Overview
 VoltCraft adopts the versatile workflow design of the APEX package for alloy property simulation. By extension of the functionality modules which incorporate our know-how in AI-driven battery simulation, easy automation of complex simulation workflow, especially those for **solid state** electrolyte, such as elastic modulus, diffusion coefficient, can be realized. 
+
 Below is a schematic showing the basic structure of VoltCraft package.
+ <div>
+    <img src="./docs/images/schematic.png" alt="Fig1" style="zoom: 35%;">
+    <p style='font-size:1.0rem; font-weight:none'>Figure 1. Workflow design of VoltCraft at current stage.</p>
+</div>
 
 Here, at current stage, VoltCraft mainly implements functionality modules aiming for dynamic atomic simulation of solid electrolyte at finite temperature. Critical performance parameters, e.g., [mean square displacement](https://en.wikipedia.org/wiki/Mean_squared_displacement) (MSD), diffusion coefficient and ionic conductivity, can be extracted. More properties, such as ionic hopping barrier, are forthcoming.
 
@@ -92,7 +97,7 @@ If submitting to Bohrium, you can check workflow progress in real-time.
 After a few minutes, if nothing goes wrong, the result would be downloaded to your work directory, which is your current directory. The msd of the four ion types: Li, P, S and Cl, are shown below.
  <div>
     <img src="./docs/images/msd.png" alt="Fig1" style="zoom: 35%;">
-    <p style='font-size:1.0rem; font-weight:none'>Figure 1. Ionic mean square displacment (MSD) of LPSCl solid electrolyte at 900 K.</p>
+    <p style='font-size:1.0rem; font-weight:none'>Figure 2. Ionic mean square displacment (MSD) of LPSCl solid electrolyte at 900 K.</p>
 </div>
 
 Note: this result may not properly converge, due to limited cell dimension and simulation time. 
