@@ -1,5 +1,15 @@
-# VoltCraft
+# VoltCraft: Battery simulation workflow automation
 [VoltCraft](https://github.com/ruoyuwang1995ucas/LAM-SSB) aims for easy automation of battery simulation, which utilized advanced machine-learning techniques such as DeePMD and DPA. VoltCraft is currently an extension of the general [APEX](https://github.com/deepmodeling/APEX) workflow, though a standalone version dedicated to battery simulation is incoming.
+
+## Table of Contents
+
+- [VoltCraft: Battery simulation workflow automation](#voltcraft-battery-simulation-workflow-automation)
+
+  - [1. Overview](#1-overview)
+  - [2. Installation](#2-installation)
+  - [3. Quick Start](#3-quick-start)
+  - [4. User Guide](#4-user-guide)
+
 
 ## 1. Overview
 VoltCraft adopts the versatile workflow design of the APEX package for alloy property simulation. By extension of the functionality modules which incorporate our know-how in AI-driven battery simulation, easy automation of complex simulation workflow, especially those for **solid state** electrolyte, such as elastic modulus, diffusion coefficient, can be realized. 
