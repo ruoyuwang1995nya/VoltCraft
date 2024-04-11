@@ -258,7 +258,6 @@ class MSD(Property):
         dt=param.get("dt",1)
         time = timestep * dt   # input.lammps：t_step= 1fs
         
-        
 
         n = data.shape[0]
         n1 = int(n * 0.3)
@@ -270,6 +269,7 @@ class MSD(Property):
         diff_cvt=param.get("diff_cvt",1e-5)
         for idx,ion in enumerate(ion_list):
             msd[ion] = data[:, idx]
+            print(msd[ion])
             plt.plot(time, msd[ion], label=ion) # 1fs= 1/1000ps
             slope,residuals = np.polyfit(time[n1:n2], msd[ion][n1:n2], 1)
             diff[ion]=slope/6*diff_cvt 
