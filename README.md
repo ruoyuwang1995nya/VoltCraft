@@ -118,7 +118,7 @@ After a few minutes, if nothing goes wrong, the result would be downloaded to yo
 
 *Note*: this is only for demonstration. The simulation time and cell dimension may not have fully converged. 
 
-You can find the calculated diffusion coefficient (valid in linear regime) at `confs/conf-1/msd_00/result.json`. By some easy data manipulation, you can calculate the ionic conductivity of Li^+ from the Nernst-Einstein relation.
+You can find the calculated diffusion coefficient (valid in linear regime) at `confs/conf-1/msd_00/result.json`. By some easy data manipulation, you can calculate the ionic conductivity of Li$^+$ from the Nernst-Einstein relation.
 
 ### 3.2 Elastic Modulus
 VoltCraft also implements the algorithms to calculate elastic modulus, which is identical to that of APEX package. Here, the elastic modulus of LiBr solid electrolyte would be calculated. An example input file looks like:
