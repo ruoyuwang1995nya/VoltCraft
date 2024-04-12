@@ -153,8 +153,9 @@ Navigate to the `example/LiBr` directory, and submit the workflow
 ```shell
 vcraft submit param_props.json -f joint -c global_bohrium.json -w ./
 ```
-\*Note: this example includes both lattice relaxation and elastic calculation, so the flow type needs to be specified as `joint`. However, this may be subject to change in the future.
-\*\*Note: you should copy the `example/LPSCl/frozen_model.pb` to current directory before workflow submission.
+*Note\*: this example includes both lattice relaxation and elastic calculation, so the flow type needs to be specified as `joint`. However, this may be subject to change in the future.*
+
+*Note\*\*: you should copy the `example/LPSCl/frozen_model.pb` to current directory before workflow submission.*
 
 Once the results are collected, the optimized cell parameters, atom coords, virials, *etc.*, are stored at `example/LiBr/confs/cubic/relaxation/relax_task/result.json`. For instance, the relaxed lattice parameter should be `5.44` Angstrom. 
 
