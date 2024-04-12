@@ -258,12 +258,17 @@ class MSD(Property):
         n = data.shape[0]
         n1 = int(n * 0.3)
         n2 = int(n * 0.9)
-        ion_list=param.get("ion_list",["ion_%s"%(i+1) for i in range(data.shape[1]-1)])
+        if ion_list:=param.get("ion_list"):
+            ion_list=ion_list
+        else:
+            ion_list={}
+            for ii in range(data.shape[1]-1):
+                ion_list["ion%s"%ii]=ii
         msd={}
         diff={}
         diff_cvt=param.get("diff_cvt",1e-5)
         plt.clf()
-        for idx,ion in enumerate(ion_list):
+        for ion,idx in ion_list.items():
             msd[ion] = data[:, idx+1]
             plt.scatter(time, msd[ion], label=ion) # 1fs= 1/1000ps
             slope,residuals = np.polyfit(time[n1:n2], msd[ion][n1:n2], 1)

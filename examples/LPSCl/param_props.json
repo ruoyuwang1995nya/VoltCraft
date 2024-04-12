@@ -4,28 +4,35 @@
         "type":          "deepmd",
         "model":         "frozen_model.pb",
         "deepmd_version":"2.2.8",
-        "type_map":      {"Li":0,"B":1,"O":2,"Al":3,"Si":4,"P":5,
-                            "S":6,"Cl":7,"Ga":8,"Ge":9,"As":10,"Br":11,"Sn":12,"Sb":13,"I":14}
+        "type_map":      {"Li":0,"B":1,"O":2,"Al":3,"Si":4,"P":5,"S":6,"Cl":7,"Ga":8,"Ge":9,"As":10,"Br":11,"Sn":12,"Sb":13,"I":14}
     },
     "properties": [
         {
          "type":         "msd",
          "skip":         false,
          "using_template": true,
-         "temperature": 300,
-         "supercell":      [1,1,1],
+         "temperature": 900,
+         "supercell":      [2,2,2],
 	      "cal_setting":  {
                 "equi_setting":{
                     "thermo-step":100,
-                    "run-step":100
+                    "run-step":10000
             },
                 "prop_setting":{
                     "thermo-step":100,
-                    "run-step":100,
-                    "msd_step":10
+                    "run-step":10000,
+                    "msd_step":100
                 }
                     
-            }
+            },
+            "res_setting":  {
+                "filename":"msd.out",
+                "delimiter": " ",
+                "ion_list":{"Li":0,"P":5,"S":6,"Cl":7},
+                "dt":1,
+                "diff_cvt":1e-5
+
+        }
         }
         ]
 }
