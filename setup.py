@@ -23,6 +23,7 @@ setuptools.setup(
         "seekpath",
         "fpop>=0.0.7",
         "boto3",
+        "apex==1.2.0"
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

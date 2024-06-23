@@ -1,15 +1,14 @@
 import glob
+import shutil
 import os.path
 import tempfile
-from typing import Type
+import logging
 from multiprocessing import Pool
 from dflow import config, s3_config
-from dflow.python import OP
 from monty.serialization import loadfn
-import fpop, dpdata, apex, phonolammps
-from apex.utils import get_task_type, get_flow_type
+import fpop, dpdata, apex #phonolammps
 from apex.config import Config
-from apex.flow import FlowFactory
+from apex.flow import FlowGenerator
 from apex.submit import judge_flow, submit
 import ssb
 from .op.property_ops import PropsMake, PropsPost
@@ -17,19 +16,19 @@ from .op.property_ops import PropsMake, PropsPost
 
 def submit_workflow(
         parameter,
-        config_file,
+        config_dict,
         work_dir,
         flow_type,
         is_debug=False,
         labels=None
 ):
-    try:
-        config_dict = loadfn(config_file)
-    except FileNotFoundError:
-        raise FileNotFoundError(
-            'Please prepare global.json under current work direction '
-            'or use optional argument: -c to indicate a specific json file.'
-        )
+    #try:
+    #    config_dict = loadfn(config_file)
+    #except FileNotFoundError:
+    #    raise FileNotFoundError(
+    #        'Please prepare global.json under current work direction '
+    #        'or use optional argument: -c to indicate a specific json file.'
+    #    )
     # config dflow_config and s3_config
     wf_config = Config(**config_dict)
     wf_config.config_dflow(wf_config.dflow_config_dict)
@@ -45,7 +44,7 @@ def submit_workflow(
     # judge basic flow info from user indicated parameter files
     (run_op, calculator, flow_type,
      relax_param, props_param) = judge_flow(parameter, flow_type)
-    print(f'Running APEX calculation via {calculator}')
+    print(f'Running calculation via {calculator}')
     print(f'Submitting {flow_type} workflow...')
     make_image = wf_config.basic_config_dict["apex_image_name"]
     run_image = wf_config.basic_config_dict[f"{calculator}_image_name"]
@@ -62,10 +61,10 @@ def submit_workflow(
     upload_python_packages.extend(list(apex.__path__))
     upload_python_packages.extend(list(fpop.__path__))
     upload_python_packages.extend(list(dpdata.__path__))
-    upload_python_packages.extend(list(phonolammps.__path__))
+    #upload_python_packages.extend(list(phonolammps.__path__))
     upload_python_packages.extend(list(ssb.__path__))
 
-    flow = FlowFactory(
+    flow = FlowGenerator(
         make_image=make_image,
         run_image=run_image,
         post_image=post_image,
@@ -84,6 +83,7 @@ def submit_workflow(
     for ii in work_dir:
         glob_list = glob.glob(os.path.abspath(ii))
         work_dir_list.extend(glob_list)
+    print(work_dir_list)
     if len(work_dir_list) > 1:
         n_processes = len(work_dir_list)
         pool = Pool(processes=n_processes)
@@ -96,7 +96,15 @@ def submit_workflow(
         pool.close()
         pool.join()
     elif len(work_dir_list) == 1:
-        submit(flow, flow_type, work_dir_list[0], relax_param, props_param, labels=labels)
+        print(relax_param)
+        submit(flow, 
+               flow_type, 
+               work_dir_list[0], 
+               relax_param, 
+               props_param, 
+               wf_config,
+               labels=labels
+               )
     else:
         raise RuntimeError('Empty work directory indicated, please check your argument')
 
