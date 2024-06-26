@@ -1,0 +1,19 @@
+{
+    "task_image": "registry.dp.tech/dptech/deepmd-kit:2024Q1-d23cf3e",
+    "executor": {
+        "image_pull_policy": "IfNotPresent",
+        "machine_dict": {
+            "batch_type": "Bohrium",
+            "context_type": "Bohrium",
+            "remote_profile": {
+                "input_data": {
+                    "job_type": "container",
+                    "platform": "paratera",
+                    "scass_type": "c12_m92_1 * NVIDIA V100",
+                    "maxRescheduleTimes": 10
+                }
+            }
+        },
+        "retry_on_submission_error": 10
+    }    
+}
