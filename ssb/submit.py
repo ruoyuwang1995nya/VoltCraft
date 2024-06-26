@@ -97,7 +97,7 @@ def submit_apexBased_wf(
     post_image = make_image
     group_size = wf_config.basic_config_dict["group_size"]
     pool_size = wf_config.basic_config_dict["pool_size"]
-    executor = wf_infer_config.get_executor(wf_config.dispatcher_config_dict)
+    executor = wf_config.get_executor(wf_config.dispatcher_config_dict)
     upload_python_packages = wf_config.basic_config_dict["upload_python_packages"]
     upload_python_packages.extend(list(apex.__path__))
     upload_python_packages.extend(list(fpop.__path__))
@@ -195,7 +195,7 @@ def submit_modelEval_wf(infer_config, config_dict):
 
 def submit_workflow(
         parameter,
-        config_file,
+        config_dict,
         work_dir,
         flow_type,
         is_debug=False,
@@ -208,6 +208,7 @@ def submit_workflow(
             'Please prepare global.json under current work direction '
             'or use optional argument: -c to indicate a specific json file.'
         )'''
+    
     try:
         params_dict = loadfn(parameter[0])
         task_type = list(params_dict.keys())[0]
@@ -230,9 +231,9 @@ def submit_workflow(
     else:
         submit_apexBased_wf(
             parameter,
-            config_file,
+            config_dict,
             work_dir,
             flow_type,
-            is_debug=False,
-            labels=None
+            is_debug=is_debug,
+            labels=labels
     )
