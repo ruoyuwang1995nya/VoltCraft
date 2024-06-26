@@ -1,0 +1,12 @@
+{  
+  "direct_inference":{
+    "name":            "direct-inference",
+    "datasets":        "dataset/Li7P3S11",
+    "model":           "frozen_model.pth",
+    "op":              "ssb.core.eval.direct_inference",
+    "type_map":       [
+      "Li",   "B",    "O",       "Al",   "Si",    "P",     "S",    "Cl",     "Ga",   "Ge",  "As",   "Br",     "Sn",   "Sb",    "I"
+   ]
+
+  }
+}

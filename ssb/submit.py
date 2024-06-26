@@ -12,9 +12,50 @@ from apex.flow import FlowGenerator
 from apex.submit import judge_flow, submit
 import ssb
 from .op.property_ops import PropsMake, PropsPost
+from .op.eval_ops import direct_inference
+import json
+import logging
 
+from importlib import import_module
+from dflow import (InputArtifact, InputParameter, OutputParameter, S3Artifact,
+                   Step, Steps, Workflow, argo_enumerate, if_expression,
+                   upload_artifact)
+from dflow.plugins.datasets import DatasetsArtifact
+from dflow.plugins.dispatcher import DispatcherExecutor, update_dict
+from dflow.python import PythonOPTemplate, Slices, upload_packages, OP, Artifact
+from pathlib import Path
+import shutil
 
-def submit_workflow(
+def get_artifact(urn, name="data", detect_systems=False):
+    if urn is None:
+        return None
+    elif isinstance(urn, str) and urn.startswith("oss://"):
+        return S3Artifact(key=urn[6:])
+    elif isinstance(urn, str) and urn.startswith("launching+datasets://"):
+        return DatasetsArtifact.from_urn(urn)
+    else:
+        if detect_systems:
+            path = []
+            for ds in urn if isinstance(urn, list) else [urn]:
+                for f in glob.glob(os.path.join(ds, "**/type.raw"), recursive=True):
+                    path.append(os.path.dirname(f))
+        else:
+            path = urn
+        artifact = upload_artifact(path)
+        if hasattr(artifact, "key"):
+            logging.info("%s uploaded to %s" % (name, artifact.key))
+        return artifact
+
+def import_func(s : str):
+    fields = s.split(".")
+    if fields[0] == __name__ or fields[0] == "":
+        fields[0] = ""
+        mod = import_module(".".join(fields[:-1]), package=__name__)
+    else:
+        mod = import_module(".".join(fields[:-1]))
+    return getattr(mod, fields[-1])
+
+def submit_apexBased_wf(
         parameter,
         config_dict,
         work_dir,
@@ -56,7 +97,7 @@ def submit_workflow(
     post_image = make_image
     group_size = wf_config.basic_config_dict["group_size"]
     pool_size = wf_config.basic_config_dict["pool_size"]
-    executor = wf_config.get_executor(wf_config.dispatcher_config_dict)
+    executor = wf_infer_config.get_executor(wf_config.dispatcher_config_dict)
     upload_python_packages = wf_config.basic_config_dict["upload_python_packages"]
     upload_python_packages.extend(list(apex.__path__))
     upload_python_packages.extend(list(fpop.__path__))
@@ -109,3 +150,89 @@ def submit_workflow(
         raise RuntimeError('Empty work directory indicated, please check your argument')
 
     print('Completed!')
+
+def submit_modelEval_wf(infer_config, config_dict):
+
+    wf_name = infer_config.get("name", "direct-inference")
+    datasets = infer_config.get("datasets", None)
+    model = infer_config.get("model", None)
+    type_map = infer_config.get("type_map", None)
+    if not datasets or not model:
+        raise ValueError("Both datasets and model must be specified in infer_config")
+
+    # Assuming get_artifact is defined elsewhere
+    dataset_artifact = get_artifact(datasets, "datasets")
+    model_artifact = get_artifact(model, "model")
+
+    upload_python_packages = []
+    upload_python_packages.extend(list(apex.__path__))
+    upload_python_packages.extend(list(ssb.__path__))
+    infer_executor = config_dict["executor"]    
+    executor = DispatcherExecutor(**infer_executor)
+    infer_template = PythonOPTemplate(
+        direct_inference, 
+        image="registry.dp.tech/dptech/deepmd-kit:2024Q1-d23cf3e",
+        python_packages=upload_python_packages
+    )
+    step = Step(
+        name="direct-inference",
+        template=infer_template,
+        parameters={
+            "type_map": type_map,
+            "msg": "Starting Inference Process"},
+        executor=executor,
+        artifacts={
+            "datasets": dataset_artifact,
+            "model": model_artifact
+        }
+    )
+
+    wf = Workflow(name=wf_name)
+    wf.add(step)
+    wf.submit()
+
+
+
+def submit_workflow(
+        parameter,
+        config_file,
+        work_dir,
+        flow_type,
+        is_debug=False,
+        labels=None
+):
+    '''try:
+        config_dict = loadfn(config_file)
+    except FileNotFoundError:
+        raise FileNotFoundError(
+            'Please prepare global.json under current work direction '
+            'or use optional argument: -c to indicate a specific json file.'
+        )'''
+    try:
+        params_dict = loadfn(parameter[0])
+        task_type = list(params_dict.keys())[0]
+    except FileNotFoundError:
+        raise FileNotFoundError(
+            """Please prepare json files with parameters under current work direction
+            and use sub-argument to appoint it."""
+        )
+
+    
+    ## submit model evaluation
+    if task_type == "direct_inference":
+        infer_config = params_dict[task_type]
+        submit_modelEval_wf(
+            infer_config,
+            config_dict
+    ) 
+
+    ## submit apex-like wf, e.g. properties calculation    
+    else:
+        submit_apexBased_wf(
+            parameter,
+            config_file,
+            work_dir,
+            flow_type,
+            is_debug=False,
+            labels=None
+    )
