@@ -1,6 +1,4 @@
 import glob
-import json
-import logging
 import os.path
 import tempfile
 from typing import Type
@@ -16,6 +14,8 @@ from apex.submit import judge_flow, submit
 import ssb
 from .op.property_ops import PropsMake, PropsPost
 from .op.eval_ops import direct_inference
+import json
+import logging
 
 from importlib import import_module
 from dflow import (InputArtifact, InputParameter, OutputParameter, S3Artifact,
@@ -186,13 +186,13 @@ def submit_workflow(
         is_debug=False,
         labels=None
 ):
-    try:
+    '''try:
         config_dict = loadfn(config_file)
     except FileNotFoundError:
         raise FileNotFoundError(
             'Please prepare global.json under current work direction '
             'or use optional argument: -c to indicate a specific json file.'
-        )
+        )'''
     try:
         params_dict = loadfn(parameter[0])
         task_type = list(params_dict.keys())[0]
