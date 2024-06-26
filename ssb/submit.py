@@ -64,6 +64,13 @@ def submit_apexBased_wf(
         is_debug=False,
         labels=None
 ):
+    #try:
+    #    config_dict = loadfn(config_file)
+    #except FileNotFoundError:
+    #    raise FileNotFoundError(
+    #        'Please prepare global.json under current work direction '
+    #        'or use optional argument: -c to indicate a specific json file.'
+    #    )
     # config dflow_config and s3_config
     wf_config = Config(**config_dict)
     wf_config.config_dflow(wf_config.dflow_config_dict)
