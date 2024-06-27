@@ -2,6 +2,7 @@ import math
 import os
 import random
 import shutil
+import glob
 from pathlib import Path
 from typing import List, Optional, Tuple
 import json
@@ -120,7 +121,10 @@ class DPValidate(OP):
         results={}
         print(path_to_sys)
         #for sys in path_to_sys:
-        abs_path_to_sys = [input_work_dir / sys for sys in path_to_sys]
+        path_to_sys_all=[]
+        for sys in path_to_sys:
+            path_to_sys_all.extend(glob.glob(sys))
+        abs_path_to_sys = [input_work_dir / sys for sys in path_to_sys_all]
         #name=Path(abs_path_to_sys).name
         rmse_f, rmse_e, rmse_v, natoms = self.validate(abs_path_to_sys, type_map)
         na = sum([sum(i) for i in natoms])
