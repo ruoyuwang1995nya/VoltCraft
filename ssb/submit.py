@@ -231,7 +231,7 @@ def submit_workflow(
         run_command=""
         calculator=""
         relax_param={}
-        props_param=parameter
+        props_param=parameter[0]
     else:
         (run_op, calculator, flow_type,
             relax_param, props_param) = judge_flow(parameter, flow_type)
