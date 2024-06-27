@@ -4,52 +4,24 @@ import random
 import shutil
 from pathlib import Path
 from typing import List, Optional, Tuple
-
+import json
 import dpdata
 import numpy as np
 from dflow.python import OP, OPIO, Artifact, OPIOSign, Parameter
 
 
-@OP.function
-def direct_inference(
-    datasets: Artifact(Path),
-    model: Artifact(Path),
-    type_map: Parameter(list),
-    msg: str = "Running Inference"
-) -> {"msg": str, "results": dict}:
-    cmd = f"dp test -m {model} -s {datasets}"
-    print(cmd)
-    output_path = Path("results.txt")
-
-    # Simulate running inference and generating results
-    with open(output_path, "w") as f:
-        f.write(f"Inference results for model {model} on dataset {datasets}\n")
+class DPValidate(OP):
     
-    # Create an instance of DPValidate 
-    validate_op = DPValidate()
-    print(datasets, model, type_map)
-    # Performing the validation
-    validate_output = validate_op.execute(OPIO({
-        "valid_systems": [datasets],
-        "model": model,
-        "type_map": type_map
-    }))
-
-    return {
-        "msg": msg,
-        "results": validate_output,
-
-    }
-
-
-class DPValidate:
+    def __init__(self):
+        pass
+    
     @classmethod
     def get_input_sign(cls):
         return OPIOSign(
             {
-                "valid_systems": Artifact(List[Path]),
-                "model": Artifact(Path),
-                "type_map": Parameter(list)
+                #"valid_systems": Artifact(List[Path]),
+                "input": Artifact(Path),
+                "parameter": Parameter(dict)
             }
         )
 
@@ -57,7 +29,7 @@ class DPValidate:
     def get_output_sign(cls):
         return OPIOSign(
             {
-                "results": dict,
+                "results": Artifact(Path),
             }
         )
 
@@ -131,9 +103,26 @@ class DPValidate:
         return rmse_f, rmse_e, rmse_v if len(rmse_v) > 0 else None, natoms
 
     @OP.exec_sign_check
-    def execute(self, ip: OPIO) -> OPIO:
-        self.load_model(ip["model"])
-        rmse_f, rmse_e, rmse_v, natoms = self.validate(ip["valid_systems"], ip["type_map"])
+    def execute(self, op_in: OPIO) -> OPIO:
+        #print("OK")
+        input_work_dir = op_in["input"]
+        cwd= Path.cwd()
+        os.chdir(input_work_dir)
+        print(os.listdir('./'))
+        parameter=op_in["parameter"]
+        print(parameter)
+        path_to_model=parameter["interaction"].get("model")
+        path_to_sys=parameter.get("structures")#["datasets"]
+        type_map=parameter["direct_inference"].get("type_map")#]
+        # access model
+        abs_path_to_model = input_work_dir / path_to_model
+        self.load_model(abs_path_to_model)
+        results={}
+        print(path_to_sys)
+        #for sys in path_to_sys:
+        abs_path_to_sys = [input_work_dir / sys for sys in path_to_sys]
+        #name=Path(abs_path_to_sys).name
+        rmse_f, rmse_e, rmse_v, natoms = self.validate(abs_path_to_sys, type_map)
         na = sum([sum(i) for i in natoms])
         nf = sum([len(i) for i in natoms])
         rmse_f = np.sqrt(sum([sum([i ** 2 * j for i, j in zip(r, n)]) for r, n in zip(rmse_f, natoms)]) / na)
@@ -141,6 +130,12 @@ class DPValidate:
         rmse_v = float(np.sqrt(np.average(np.concatenate(rmse_v) ** 2))) if rmse_v is not None else None
         print(rmse_e, rmse_f, rmse_v)
         results = {"rmse_f": float(rmse_f), "rmse_e": float(rmse_e), "rmse_v": rmse_v}
-        return {
-            "results": results,
-        }
+        os.chdir(cwd)
+        with open("infer_result.json",'w') as f:
+            json.dump(results,f,indent=4)
+        op_out=OPIO({
+            "results": Path("./infer_result.json")
+            }
+            )
+        
+        return op_out#OPIO({"results": {"status": 0}})
