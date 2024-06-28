@@ -99,7 +99,6 @@ class FlowGenerator:
                 raise RuntimeError(f'Workflow failed (ID: {self.workflow.id}, UID: {self.workflow.uid})')
             try:
                 inference_post = step_info.get_step(name='inference-cal')[0]
-                print(inference_post)
             except IndexError:
                 continue
             if inference_post['phase'] == 'Succeeded':

@@ -37,7 +37,9 @@ class DPValidate(OP):
     def load_model(self, model: Path):
         self.model = model
         from deepmd.infer import DeepPot
+        print("Loading model")
         self.dp = DeepPot(model)
+        print("Model loaded")
 
     def evaluate(self,
                  coord: np.ndarray,
@@ -117,6 +119,7 @@ class DPValidate(OP):
         type_map=parameter["direct_inference"].get("type_map")#]
         # access model
         abs_path_to_model = input_work_dir / path_to_model
+        print("Loading model")
         self.load_model(abs_path_to_model)
         results={}
         print(path_to_sys)

@@ -129,7 +129,8 @@ class InferenceFlow(Steps):
             parameters={
                 "parameter": self.inputs.parameters["parameter"]
                 },
-            key=self.step_keys["infer"]
+            key=self.step_keys["infer"],
+            executor=executor
         )
         self.add(infer)
         self.outputs.artifacts["results"]._from = infer.outputs.artifacts["results"]
