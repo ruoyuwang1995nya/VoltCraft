@@ -7,55 +7,193 @@ from multiprocessing import Pool
 from dflow import config, s3_config
 from monty.serialization import loadfn
 import fpop, dpdata, apex #phonolammps
-from apex.config import Config
-from apex.flow import FlowGenerator
-from apex.submit import judge_flow, submit
+from .config import Config
+from apex.archive import archive_workdir
 import ssb
 from .op.property_ops import PropsMake, PropsPost
-from .op.eval_ops import direct_inference
-import json
+from .flow import FlowGenerator
+from .op.eval_ops import DPValidate#direct_inference
 import logging
-
-from importlib import import_module
-from dflow import (InputArtifact, InputParameter, OutputParameter, S3Artifact,
-                   Step, Steps, Workflow, argo_enumerate, if_expression,
-                   upload_artifact)
-from dflow.plugins.datasets import DatasetsArtifact
-from dflow.plugins.dispatcher import DispatcherExecutor, update_dict
-from dflow.python import PythonOPTemplate, Slices, upload_packages, OP, Artifact
-from pathlib import Path
 import shutil
 
-def get_artifact(urn, name="data", detect_systems=False):
-    if urn is None:
-        return None
-    elif isinstance(urn, str) and urn.startswith("oss://"):
-        return S3Artifact(key=urn[6:])
-    elif isinstance(urn, str) and urn.startswith("launching+datasets://"):
-        return DatasetsArtifact.from_urn(urn)
-    else:
-        if detect_systems:
-            path = []
-            for ds in urn if isinstance(urn, list) else [urn]:
-                for f in glob.glob(os.path.join(ds, "**/type.raw"), recursive=True):
-                    path.append(os.path.dirname(f))
-        else:
-            path = urn
-        artifact = upload_artifact(path)
-        if hasattr(artifact, "key"):
-            logging.info("%s uploaded to %s" % (name, artifact.key))
-        return artifact
+from apex.utils import (
+    judge_flow,
+    load_config_file,
+    json2dict,
+    copy_all_other_files,
+    sepline,
+    handle_prop_suffix,
+    backup_path
+)
 
-def import_func(s : str):
-    fields = s.split(".")
-    if fields[0] == __name__ or fields[0] == "":
-        fields[0] = ""
-        mod = import_module(".".join(fields[:-1]), package=__name__)
-    else:
-        mod = import_module(".".join(fields[:-1]))
-    return getattr(mod, fields[-1])
 
-def submit_apexBased_wf(
+def pack_upload_dir(
+        work_dir: os.PathLike,
+        upload_dir: os.PathLike,
+        relax_param: dict,
+        prop_param: dict,
+        flow_type: str
+):
+    """
+    Pack the necessary files and directories into temp dir and upload it to dflow
+    """
+    cwd = os.getcwd()
+    os.chdir(work_dir)
+    relax_confs = relax_param.get("structures", []) if relax_param else []
+    prop_confs = prop_param.get("structures", []) if prop_param else []
+    relax_prefix = relax_param["interaction"].get("potcar_prefix", None) if relax_param else None
+    prop_prefix = prop_param["interaction"].get("potcar_prefix", None) if prop_param else None
+    include_dirs = set()
+    if relax_prefix:
+        relax_prefix_base = relax_prefix.split('/')[0]
+        include_dirs.add(relax_prefix_base)
+    if prop_prefix:
+        prop_prefix_base = prop_prefix.split('/')[0]
+        include_dirs.add(prop_prefix_base)
+    confs = relax_confs + prop_confs
+    assert len(confs) > 0, "No configuration path indicated!"
+    conf_dirs = []
+    for conf in confs:
+        conf_dirs.extend(glob.glob(conf))
+    conf_dirs = list(set(conf_dirs))
+    conf_dirs.sort()
+    refine_init_name_list = []
+    # backup all existing property work directories
+    if flow_type in ['props', 'joint']:
+        property_list = prop_param["properties"]
+        for ii in conf_dirs:
+            sepline(ch=ii, screen=True)
+            for jj in property_list:
+                do_refine, suffix = handle_prop_suffix(jj)
+                property_type = jj["type"]
+                if not suffix:
+                    continue
+                if do_refine:
+                    refine_init_suffix = jj['init_from_suffix']
+                    refine_init_name_list.append(property_type + "_" + refine_init_suffix)
+                path_to_prop = os.path.join(ii, property_type + "_" + suffix)
+                backup_path(path_to_prop)
+
+    """copy necessary files and directories into temp upload directory"""
+    copy_all_other_files(
+        work_dir, upload_dir,
+        exclude_files=["all_result.json"],
+        include_dirs=list(include_dirs)
+    )
+    for ii in conf_dirs:
+        build_conf_path = os.path.join(upload_dir, ii)
+        os.makedirs(build_conf_path, exist_ok=True)
+        copy_poscar_path = os.path.abspath(os.path.join(ii, "POSCAR"))
+        copy_stru_path = os.path.abspath(os.path.join(ii, "STRU"))
+        if os.path.isfile(copy_poscar_path):
+            target_poscar_path = os.path.join(build_conf_path, "POSCAR")
+            shutil.copy(copy_poscar_path, target_poscar_path)
+        if os.path.isfile(copy_stru_path):
+            target_stru_path = os.path.join(build_conf_path, "STRU")
+            shutil.copy(copy_stru_path, target_stru_path)
+        if flow_type == "inference":
+            if os.path.isdir(build_conf_path):
+                shutil.rmtree(build_conf_path)
+                #os.remove(build_conf_path)
+            shutil.copytree(ii,build_conf_path)
+        if flow_type == 'props':
+            copy_relaxation_path = os.path.abspath(os.path.join(ii, "relaxation"))
+            target_relaxation_path = os.path.join(build_conf_path, "relaxation")
+            shutil.copytree(copy_relaxation_path, target_relaxation_path)
+            # copy refine from init path to upload dir
+            if refine_init_name_list:
+                for jj in refine_init_name_list:
+                    copy_init_path = os.path.abspath(os.path.join(ii, jj))
+                    assert os.path.exists(copy_init_path), f'refine from init path {copy_init_path} does not exist!'
+                    target_init_path = os.path.join(build_conf_path, jj)
+                    shutil.copytree(copy_init_path, target_init_path)
+
+    os.chdir(cwd)
+
+
+def submit(
+        flow,
+        flow_type,
+        work_dir,
+        relax_param,
+        props_param,
+        wf_config,
+        conf=config,
+        s3_conf=s3_config,
+        is_sub=False,
+        labels=None,
+):
+    if is_sub:
+        # reset dflow global config for sub-processes
+        logging.info(msg=f'Sub-process working on: {work_dir}')
+        config.update(conf)
+        s3_config.update(s3_conf)
+        logging.basicConfig(level=logging.INFO)
+    else:
+        logging.info(msg=f'Working on: {work_dir}')
+        
+    print(props_param)
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        logging.debug(msg=f'Temporary upload directory:{tmp_dir}')
+        pack_upload_dir(
+            work_dir=work_dir,
+            upload_dir=tmp_dir,
+            relax_param=relax_param,
+            prop_param=props_param,
+            flow_type=flow_type
+        )
+
+        flow_id = None
+        flow_name = wf_config.flow_name
+        submit_only = wf_config.submit_only
+        if flow_type == 'relax':
+            flow_id = flow.submit_relax(
+                upload_path=tmp_dir,
+                download_path=work_dir,
+                relax_parameter=relax_param,
+                submit_only=submit_only,
+                name=flow_name,
+                labels=labels
+            )
+        elif flow_type == 'props':
+            flow_id = flow.submit_props(
+                upload_path=tmp_dir,
+                download_path=work_dir,
+                props_parameter=props_param,
+                submit_only=submit_only,
+                name=flow_name,
+                labels=labels
+            )
+        elif flow_type == 'joint':
+            flow_id = flow.submit_joint(
+                upload_path=tmp_dir,
+                download_path=work_dir,
+                props_parameter=props_param,
+                relax_parameter=relax_param,
+                submit_only=submit_only,
+                name=flow_name,
+                labels=labels
+            )
+        elif flow_type == 'inference':
+            flow_id = flow.submit_inference(
+                upload_path=tmp_dir,
+                download_path=work_dir,
+                infer_parameter=props_param,
+                submit_only=submit_only,
+                name=flow_name,
+                labels=labels
+            )
+
+    #if not submit_only:
+    #    # auto archive results
+    #    print(f'Archiving results of workflow (ID: {flow_id}) into {wf_config.database_type}...')
+    #    archive_workdir(relax_param, props_param, wf_config, work_dir, flow_type)
+
+
+
+
+def submit_workflow(
         parameter,
         config_dict,
         work_dir,
@@ -82,29 +220,40 @@ def submit_apexBased_wf(
         config["debug_workdir"] = config_dict.get("debug_workdir", tmp_work_dir.name)
         s3_config["storage_client"] = None
 
+    print(wf_config.basic_config_dict)
     # judge basic flow info from user indicated parameter files
-    (run_op, calculator, flow_type,
-     relax_param, props_param) = judge_flow(parameter, flow_type)
-    print(f'Running calculation via {calculator}')
-    print(f'Submitting {flow_type} workflow...')
-    make_image = wf_config.basic_config_dict["apex_image_name"]
-    run_image = wf_config.basic_config_dict[f"{calculator}_image_name"]
-    if not run_image:
-        run_image = wf_config.basic_config_dict["run_image_name"]
-    run_command = wf_config.basic_config_dict[f"{calculator}_run_command"]
-    if not run_command:
-        run_command = wf_config.basic_config_dict["run_command"]
+    if flow_type=="inference":
+        make_image=""
+        run_op=DPValidate
+        run_image = wf_config.basic_config_dict[f"inference_image_name"]
+        #if not run_image:
+        #    run_image = "registry.dp.tech/dptech/deepmd-kit:2024Q1-d23cf3e"
+        run_command=""
+        calculator=""
+        relax_param={}
+        props_param=parameter[0]
+    else:
+        (run_op, calculator, flow_type,
+            relax_param, props_param) = judge_flow(parameter, flow_type)
+        print(f'Running calculation via {calculator}')
+        make_image = wf_config.basic_config_dict["apex_image_name"]
+        run_image = wf_config.basic_config_dict[f"{calculator}_image_name"]
+        if not run_image:
+            run_image = wf_config.basic_config_dict["run_image_name"]
+        run_command = wf_config.basic_config_dict[f"{calculator}_run_command"]
+        if not run_command:
+            run_command = wf_config.basic_config_dict["run_command"]
     post_image = make_image
     group_size = wf_config.basic_config_dict["group_size"]
     pool_size = wf_config.basic_config_dict["pool_size"]
-    executor = wf_infer_config.get_executor(wf_config.dispatcher_config_dict)
+    executor = wf_config.get_executor(wf_config.dispatcher_config_dict)
     upload_python_packages = wf_config.basic_config_dict["upload_python_packages"]
     upload_python_packages.extend(list(apex.__path__))
     upload_python_packages.extend(list(fpop.__path__))
     upload_python_packages.extend(list(dpdata.__path__))
-    #upload_python_packages.extend(list(phonolammps.__path__))
     upload_python_packages.extend(list(ssb.__path__))
-
+    
+    print(f'Submitting {flow_type} workflow...')
     flow = FlowGenerator(
         make_image=make_image,
         run_image=run_image,
@@ -150,89 +299,3 @@ def submit_apexBased_wf(
         raise RuntimeError('Empty work directory indicated, please check your argument')
 
     print('Completed!')
-
-def submit_modelEval_wf(infer_config, config_dict):
-
-    wf_name = infer_config.get("name", "direct-inference")
-    datasets = infer_config.get("datasets", None)
-    model = infer_config.get("model", None)
-    type_map = infer_config.get("type_map", None)
-    if not datasets or not model:
-        raise ValueError("Both datasets and model must be specified in infer_config")
-
-    # Assuming get_artifact is defined elsewhere
-    dataset_artifact = get_artifact(datasets, "datasets")
-    model_artifact = get_artifact(model, "model")
-
-    upload_python_packages = []
-    upload_python_packages.extend(list(apex.__path__))
-    upload_python_packages.extend(list(ssb.__path__))
-    infer_executor = config_dict["executor"]    
-    executor = DispatcherExecutor(**infer_executor)
-    infer_template = PythonOPTemplate(
-        direct_inference, 
-        image="registry.dp.tech/dptech/deepmd-kit:2024Q1-d23cf3e",
-        python_packages=upload_python_packages
-    )
-    step = Step(
-        name="direct-inference",
-        template=infer_template,
-        parameters={
-            "type_map": type_map,
-            "msg": "Starting Inference Process"},
-        executor=executor,
-        artifacts={
-            "datasets": dataset_artifact,
-            "model": model_artifact
-        }
-    )
-
-    wf = Workflow(name=wf_name)
-    wf.add(step)
-    wf.submit()
-
-
-
-def submit_workflow(
-        parameter,
-        config_file,
-        work_dir,
-        flow_type,
-        is_debug=False,
-        labels=None
-):
-    '''try:
-        config_dict = loadfn(config_file)
-    except FileNotFoundError:
-        raise FileNotFoundError(
-            'Please prepare global.json under current work direction '
-            'or use optional argument: -c to indicate a specific json file.'
-        )'''
-    try:
-        params_dict = loadfn(parameter[0])
-        task_type = list(params_dict.keys())[0]
-    except FileNotFoundError:
-        raise FileNotFoundError(
-            """Please prepare json files with parameters under current work direction
-            and use sub-argument to appoint it."""
-        )
-
-    
-    ## submit model evaluation
-    if task_type == "direct_inference":
-        infer_config = params_dict[task_type]
-        submit_modelEval_wf(
-            infer_config,
-            config_dict
-    ) 
-
-    ## submit apex-like wf, e.g. properties calculation    
-    else:
-        submit_apexBased_wf(
-            parameter,
-            config_file,
-            work_dir,
-            flow_type,
-            is_debug=False,
-            labels=None
-    )
