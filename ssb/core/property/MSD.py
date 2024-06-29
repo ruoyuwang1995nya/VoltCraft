@@ -183,17 +183,19 @@ class MSD(Property):
         # task directory
         task_dirs = glob.glob(os.path.join(path_to_work, "task.[0-9]*[0-9]"))
         task_dirs.sort()
+        print(task_dirs)
         # read msd output filename
         res_setting=self.parameter["res_setting"]
-        msd_data=res_setting.get("filename","msd.out")
+        msd_data_name=res_setting.get("filename","msd.out")
         print(res_setting)
         all_res=[]
         for idx, ii in enumerate(task_dirs):
             task_res={}
-            msd_data=os.path.join(ii,msd_data)
+            msd_data=os.path.join(ii,msd_data_name)
+            print(msd_data)
             task_res["diffusion_coef"]=__class__.msd2diff(msd_data,res_setting,png_path=ii)
             
-            #print(s)
+            print("Diff at",ii, 'is', task_res["diffusion_coef"])
             if skip_sigma is False:
                 task_res["sigma"]=__class__.diff2sigma(
                         task_res["diffusion_coef"],

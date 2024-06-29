@@ -112,7 +112,7 @@ class PropsMake(OP):
         all_jobs = task_list
         njobs = len(all_jobs)
         jobs = [pathlib.Path(job) for job in task_list]
-
+        print(jobs)
         os.chdir(cwd)
         op_out = OPIO({
             "output_work_path": input_work_path,
