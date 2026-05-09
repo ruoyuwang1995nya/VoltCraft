@@ -82,7 +82,7 @@ def make_lammps_msd(
     ## production run
     # assign compute to each atom
     c_msd=""
-    for ii in range(len(type_map)):
+    for ii in range(min(len(type_map), 32)):
         ret += "compute  msd%s  %s msd\n" % (ii+1, type_map_list[ii])
         c_msd+="c_msd%s[4] "%(ii+1)
     msd_step=prop_setting.get("msd_step",10)
